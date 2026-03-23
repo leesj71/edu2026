@@ -7,9 +7,9 @@
 <!-- html5-qrcode CDN -->
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
-<!-- ★ Firebase SDK (compat v9) ★ -->
+<!-- ★ Firebase SDK (compat v9) — Realtime Database ★ -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -938,6 +938,7 @@ textarea{resize:vertical;min-height:70px}
 const firebaseConfig = {
   apiKey:            "AIzaSyD7t1ZeVPnDsP4jDnwJ7d4MxIWZN6mTqaU",
   authDomain:        "yerang2026.firebaseapp.com",
+  databaseURL:       "https://yerang2026-default-rtdb.firebaseio.com",
   projectId:         "yerang2026",
   storageBucket:     "yerang2026.firebasestorage.app",
   messagingSenderId: "318810214607",
@@ -947,16 +948,14 @@ const firebaseConfig = {
 
 // Firebase 초기화
 firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+const db = firebase.database();
 
-// Firestore 경로
-// 회원: yerang_v5_members/{memberId}  (각 회원이 독립 문서 → 1MB 제한 없음)
-// 상태: yerang_v5/state               (세션·음식·책·로그 등)
-const MEMBERS_COL = db.collection('yerang_v5_members');
-const STATE_DOC   = db.collection('yerang_v5').doc('state');
+// Realtime Database 경로
+const MEMBERS_REF = db.ref('yerang_v5/members');
+const STATE_REF   = db.ref('yerang_v5/state');
 
 // ════════════════════════════════════════════════
-// STATE — 기본값 (Firebase에 데이터 없을 때만 사용)
+// STATE — 기본값
 // ════════════════════════════════════════════════
 let members = [];
 let sessions = [
@@ -967,15 +966,10 @@ let sessions = [
    earn:[{name:'입국 심사 완료',coin:2,reward:'coin'},{name:'부활절 성경 퀴즈',coin:3,reward:'both'},{name:'달걀 꾸미기',coin:1,reward:'stamp'}],
    spend:[{name:'떡볶이 1컵',coin:5},{name:'팝콘',coin:3},{name:'음료수',coin:2}]},
 ];
-let foods = [
-  {name:'떡볶이 1컵',coin:5},{name:'팝콘',coin:3},{name:'음료수',coin:2},{name:'선물 뽑기권',coin:10},
-];
-let books = [
-  {id:'BOOK-001',title:'지혜의 왕 솔로몬',author:'성경 이야기'},
-  {id:'BOOK-002',title:'다윗과 골리앗',author:'성경 이야기'},
-];
-let logs     = [];
-let foodLogs = [];
+let foods     = [{name:'떡볶이 1컵',coin:5},{name:'팝콘',coin:3},{name:'음료수',coin:2},{name:'선물 뽑기권',coin:10}];
+let books     = [{id:'BOOK-001',title:'지혜의 왕 솔로몬',author:'성경 이야기'},{id:'BOOK-002',title:'다윗과 골리앗',author:'성경 이야기'}];
+let logs      = [];
+let foodLogs  = [];
 let nextNum     = 1;
 let nextBookNum = 3;
 let introLink   = '';
@@ -987,16 +981,16 @@ let curRevStar  = 0;
 let _fbReady    = false;
 
 // ════════════════════════════════════════════════
-// FIREBASE SAVE — Firebase에 저장 (fire-and-forget)
+// FIREBASE SAVE — Realtime Database에 저장
 // ════════════════════════════════════════════════
 function saveAll(){
-  // ① 회원 배치 저장 (각 회원이 독립 문서)
-  const batch = db.batch();
-  members.forEach(m => batch.set(MEMBERS_COL.doc(m.id), m));
-  batch.commit().catch(e => { console.warn('회원 저장 실패', e); toast('저장 실패: ' + e.message, 'err'); });
+  // 회원 저장 (객체 형태로 변환)
+  const membersObj = {};
+  members.forEach(m => { membersObj[m.id.replace(/-/g,'_')] = m; });
+  MEMBERS_REF.set(membersObj).catch(e => { toast('저장 실패: ' + e.message, 'err'); console.error(e); });
 
-  // ② 상태 저장 (세션·음식·책·로그 등)
-  STATE_DOC.set({
+  // 상태 저장
+  STATE_REF.set({
     sessions,
     foods,
     books,
@@ -1008,17 +1002,14 @@ function saveAll(){
   }).catch(e => console.warn('상태 저장 실패', e));
 }
 
-// 회원 삭제: Firestore 문서도 명시 삭제
+// 회원 삭제
 function deleteMemberFromDB(id){
-  MEMBERS_COL.doc(id).delete().catch(e => console.warn('회원 문서 삭제 실패', e));
+  MEMBERS_REF.child(id.replace(/-/g,'_')).remove().catch(e => console.warn('삭제 실패', e));
 }
 
-// 전체 초기화 시 모든 회원 문서 삭제
+// 전체 초기화
 async function deleteAllMembersFromDB(){
-  const snap = await MEMBERS_COL.get();
-  const batch = db.batch();
-  snap.docs.forEach(d => batch.delete(d.ref));
-  await batch.commit();
+  await MEMBERS_REF.remove();
 }
 
 // ════════════════════════════════════════════════
@@ -1034,11 +1025,11 @@ function showLoadError(msg){
   const el = document.getElementById('loading-error');
   if(!el) return;
   el.style.display = 'block';
-  el.innerHTML = '❌ ' + msg + '<br><small style="color:#aaa">firebaseConfig를 확인하고 새로고침 해주세요</small>';
+  el.innerHTML = '❌ ' + msg + '<br><small style="color:#aaa">firebaseConfig 또는 보안 규칙을 확인해 주세요</small>';
 }
 
 // ════════════════════════════════════════════════
-// FIREBASE REAL-TIME LISTENERS — 실시간 동기화
+// FIREBASE REAL-TIME LISTENERS
 // ════════════════════════════════════════════════
 let _membersLoaded = false;
 let _stateLoaded   = false;
@@ -1046,14 +1037,19 @@ let _stateLoaded   = false;
 function initFirebase(){
   showLoading(true, '☁️ Firebase 연결 중...');
 
-  // ── 회원 컬렉션 실시간 감지 ──
-  MEMBERS_COL.onSnapshot(snap => {
-    members = snap.docs.map(d => d.data());
-    members.sort((a, b) => {
-      const na = parseInt(a.id.replace('JD-',''))||0;
-      const nb = parseInt(b.id.replace('JD-',''))||0;
-      return na - nb;
-    });
+  // ── 회원 실시간 감지 ──
+  MEMBERS_REF.on('value', snap => {
+    const data = snap.val();
+    if(data){
+      members = Object.values(data);
+      members.sort((a, b) => {
+        const na = parseInt(a.id.replace('JD-',''))||0;
+        const nb = parseInt(b.id.replace('JD-',''))||0;
+        return na - nb;
+      });
+    } else {
+      members = [];
+    }
     // nextNum 자동 갱신
     members.forEach(m => {
       const n = parseInt(m.id.replace('JD-',''))||0;
@@ -1070,23 +1066,22 @@ function initFirebase(){
   }, err => {
     showLoading(false);
     showLoadError('회원 데이터 로드 실패: ' + err.message);
-    console.error('Members onSnapshot error:', err);
   });
 
-  // ── 상태 문서 실시간 감지 ──
-  STATE_DOC.onSnapshot(snap => {
-    if(snap.exists){
-      const d = snap.data();
-      sessions    = d.sessions    || sessions;
-      foods       = d.foods       || foods;
-      books       = d.books       || books;
-      logs        = d.logs        || [];
-      foodLogs    = d.foodLogs    || [];
-      nextNum     = d.nextNum     || nextNum;
-      nextBookNum = d.nextBookNum || nextBookNum;
-      introLink   = d.introLink   || '';
+  // ── 상태 실시간 감지 ──
+  STATE_REF.on('value', snap => {
+    const data = snap.val();
+    if(data){
+      sessions    = data.sessions    || sessions;
+      foods       = data.foods       || foods;
+      books       = data.books       || books;
+      logs        = data.logs        || [];
+      foodLogs    = data.foodLogs    || [];
+      nextNum     = data.nextNum     || nextNum;
+      nextBookNum = data.nextBookNum || nextBookNum;
+      introLink   = data.introLink   || '';
     } else {
-      // 최초 실행 — 기본값 Firebase에 쓰기
+      // 최초 실행 — 기본값 저장
       console.log('Firebase 최초 실행: 기본값 저장');
       saveAll();
     }
@@ -1096,7 +1091,6 @@ function initFirebase(){
   }, err => {
     showLoading(false);
     showLoadError('상태 데이터 로드 실패: ' + err.message);
-    console.error('State onSnapshot error:', err);
   });
 }
 
@@ -1111,7 +1105,6 @@ function _checkFBReady(){
   }
 }
 
-// 현재 페이지 다시 렌더링 (다른 기기에서 변경 시 자동 반영)
 function _reRenderCurrent(){
   renderRegList();
   const cur = document.querySelector('.page.on');
