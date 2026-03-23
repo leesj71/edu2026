@@ -485,16 +485,58 @@ textarea{resize:vertical;min-height:70px}
      PAGE: MY PAGE
 ════════════════════════════════════════════════════════ -->
 <div id="page-mypage" class="page">
-  <div class="card card-sm" style="margin-bottom:14px">
+
+  <!-- STEP 1: 이름/여권번호 입력 -->
+  <div id="my-step-id" class="card card-sm" style="margin-bottom:14px">
     <div class="slabel" style="margin-bottom:6px">여권 번호 또는 이름 입력</div>
     <div style="display:flex;gap:8px">
-      <input type="text" id="my-input" placeholder="예: JD-001 또는 홍길동" style="margin:0;text-transform:uppercase" onkeydown="if(event.key===&#39;Enter&#39;)loadMyPage()">
-      <button class="btn btn-g" style="flex-shrink:0" onclick="loadMyPage()">확인</button>
+      <input type="text" id="my-input" placeholder="예: JD-001 또는 홍길동" style="margin:0;text-transform:uppercase" onkeydown="if(event.key==='Enter')findMember()">
+      <button class="btn btn-g" style="flex-shrink:0" onclick="findMember()">확인</button>
     </div>
     <div id="my-error" style="display:none;color:var(--r1);font-size:12px;margin-top:6px">❌ 여권 번호 또는 이름을 다시 확인해주세요</div>
   </div>
 
+  <!-- STEP 2a: 비밀번호 입력 (기존 회원) -->
+  <div id="my-step-pin" class="card" style="display:none;margin-bottom:14px">
+    <div style="text-align:center;margin-bottom:16px">
+      <div style="font-size:36px;margin-bottom:8px">🔐</div>
+      <div id="my-pin-name" style="font-size:16px;font-weight:700;color:var(--t1)"></div>
+      <div style="font-size:12px;color:var(--t2);margin-top:4px">비밀번호를 입력해주세요</div>
+    </div>
+    <div class="field">
+      <input type="password" id="my-pin-input" placeholder="비밀번호 입력" style="text-align:center;font-size:18px;letter-spacing:.2em" onkeydown="if(event.key==='Enter')verifyPin()">
+    </div>
+    <div id="my-pin-error" style="display:none;color:var(--r1);font-size:12px;text-align:center;margin-bottom:8px">❌ 비밀번호가 틀렸어요</div>
+    <button class="btn btn-g btn-block" onclick="verifyPin()">로그인</button>
+    <button class="btn btn-block" style="margin-top:8px;font-size:12px;color:var(--t3)" onclick="backToIdStep()">← 다시 입력</button>
+  </div>
+
+  <!-- STEP 2b: 비밀번호 설정 (최초) -->
+  <div id="my-step-setpin" class="card" style="display:none;margin-bottom:14px">
+    <div style="text-align:center;margin-bottom:16px">
+      <div style="font-size:36px;margin-bottom:8px">🔑</div>
+      <div id="my-setpin-name" style="font-size:16px;font-weight:700;color:var(--t1)"></div>
+      <div style="font-size:12px;color:var(--t2);margin-top:4px">처음 로그인이에요! 비밀번호를 설정해주세요</div>
+    </div>
+    <div class="field">
+      <label>새 비밀번호</label>
+      <input type="password" id="my-newpin1" placeholder="숫자 또는 문자 4자리 이상">
+    </div>
+    <div class="field">
+      <label>비밀번호 확인</label>
+      <input type="password" id="my-newpin2" placeholder="한 번 더 입력" onkeydown="if(event.key==='Enter')setNewPin()">
+    </div>
+    <div id="my-setpin-error" style="display:none;color:var(--r1);font-size:12px;margin-bottom:8px">❌ 비밀번호가 일치하지 않아요 (4자리 이상)</div>
+    <button class="btn btn-g btn-block" onclick="setNewPin()">비밀번호 설정 완료</button>
+    <button class="btn btn-block" style="margin-top:8px;font-size:12px;color:var(--t3)" onclick="backToIdStep()">← 다시 입력</button>
+  </div>
+
   <div id="my-content" style="display:none">
+    <!-- 상단: 로그아웃 + 비밀번호 변경 -->
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <button class="btn btn-sm" style="flex:1;border-color:var(--orange);color:var(--orange)" onclick="openChangePinModal()">🔑 비밀번호 변경</button>
+      <button class="btn btn-sm" style="border-color:var(--bd);color:var(--t2)" onclick="logoutMyPage()">로그아웃</button>
+    </div>
     <!-- PASSPORT -->
     <div class="passport-wrap">
       <div class="passport" id="my-passport"></div>
@@ -928,6 +970,31 @@ textarea{resize:vertical;min-height:70px}
   </div>
 </div>
 
+<!-- CHANGE PIN MODAL -->
+<div class="moverlay" id="changepin-modal">
+  <div class="mbox">
+    <div class="mhandle"></div>
+    <div class="mtitle">🔑 비밀번호 변경</div>
+    <div class="field">
+      <label>현재 비밀번호</label>
+      <input type="password" id="cp-old" placeholder="현재 비밀번호">
+    </div>
+    <div class="field">
+      <label>새 비밀번호</label>
+      <input type="password" id="cp-new1" placeholder="새 비밀번호 (4자리 이상)">
+    </div>
+    <div class="field">
+      <label>새 비밀번호 확인</label>
+      <input type="password" id="cp-new2" placeholder="한 번 더 입력">
+    </div>
+    <div id="cp-error" style="display:none;color:var(--r1);font-size:12px;margin-bottom:8px"></div>
+    <div class="mfooter">
+      <button class="btn btn-g btn-block" onclick="saveChangedPin()">변경 저장</button>
+      <button class="btn btn-block" onclick="closeModal('changepin-modal')">취소</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -1050,8 +1117,9 @@ function normalizeMember(m){
     attended:  toArr(m.attended),
     logs:      toArr(m.logs),
     bookLogs:  toArr(m.bookLogs),
-    // stamps는 {sessionNum: count} 형태의 일반 객체 — 그대로 유지
-    stamps:    (m.stamps && typeof m.stamps === 'object' && !Array.isArray(m.stamps)) ? m.stamps : {}
+    stamps:    (m.stamps && typeof m.stamps === 'object' && !Array.isArray(m.stamps)) ? m.stamps : {},
+    // pin은 있을 수도 없을 수도 있음 — 그대로 유지
+    ...(m.pin ? {pin: m.pin} : {})
   };
 }
 
@@ -1348,18 +1416,140 @@ function renderRegList(){
 }
 
 // ════════════════════════════════════════════════
-// MY PAGE
+// MY PAGE — 비밀번호 로그인 흐름
 // ════════════════════════════════════════════════
-function loadMyPage(){
-  const v=$('my-input').value.trim().toUpperCase();
-  $('my-error').style.display='none';
-  $('my-content').style.display='none';
-  const m=members.find(x=>x.id===v||x.name===v||x.name.toUpperCase()===v);
-  if(!m){$('my-error').style.display='block';return}
-  myMember=m;
-  renderPassport(m);renderMyCoin(m);renderMyStamps(m);renderMyAttend(m);renderMyBooks(m);
-  $('my-content').style.display='block';
+let _pendingMember = null; // 비밀번호 확인 대기 중인 회원
+
+function findMember(){
+  const v = $('my-input').value.trim().toUpperCase();
+  $('my-error').style.display = 'none';
+  const m = members.find(x => x.id === v || x.name === v || x.name.toUpperCase() === v);
+  if(!m){ $('my-error').style.display = 'block'; return; }
+  _pendingMember = m;
+
+  if(m.pin){
+    // 비밀번호 있음 → 입력 단계
+    $('my-step-id').style.display    = 'none';
+    $('my-step-setpin').style.display = 'none';
+    $('my-step-pin').style.display   = 'block';
+    $('my-pin-name').textContent     = m.name + '님 👋';
+    $('my-pin-input').value          = '';
+    $('my-pin-error').style.display  = 'none';
+    setTimeout(() => $('my-pin-input').focus(), 100);
+  } else {
+    // 비밀번호 없음 → 설정 단계
+    $('my-step-id').style.display     = 'none';
+    $('my-step-pin').style.display    = 'none';
+    $('my-step-setpin').style.display = 'block';
+    $('my-setpin-name').textContent   = m.name + '님, 처음이시군요! 🎉';
+    $('my-newpin1').value = '';
+    $('my-newpin2').value = '';
+    $('my-setpin-error').style.display = 'none';
+    setTimeout(() => $('my-newpin1').focus(), 100);
+  }
 }
+
+function verifyPin(){
+  if(!_pendingMember) return;
+  const entered = $('my-pin-input').value;
+  $('my-pin-error').style.display = 'none';
+  if(entered !== _pendingMember.pin){
+    $('my-pin-error').style.display = 'block';
+    $('my-pin-input').value = '';
+    $('my-pin-input').focus();
+    return;
+  }
+  openMyPage(_pendingMember);
+}
+
+function setNewPin(){
+  if(!_pendingMember) return;
+  const p1 = $('my-newpin1').value;
+  const p2 = $('my-newpin2').value;
+  $('my-setpin-error').style.display = 'none';
+  if(p1.length < 4 || p1 !== p2){
+    $('my-setpin-error').style.display = 'block';
+    return;
+  }
+  _pendingMember.pin = p1;
+  saveAll();
+  toast('🔑 비밀번호가 설정됐어요!');
+  openMyPage(_pendingMember);
+}
+
+function openMyPage(m){
+  myMember = m;
+  $('my-step-id').style.display     = 'none';
+  $('my-step-pin').style.display    = 'none';
+  $('my-step-setpin').style.display = 'none';
+  renderPassport(m); renderMyCoin(m); renderMyStamps(m); renderMyAttend(m); renderMyBooks(m);
+  $('my-content').style.display = 'block';
+}
+
+function backToIdStep(){
+  _pendingMember = null;
+  $('my-step-pin').style.display    = 'none';
+  $('my-step-setpin').style.display = 'none';
+  $('my-step-id').style.display     = 'block';
+}
+
+function logoutMyPage(){
+  myMember = null;
+  _pendingMember = null;
+  $('my-content').style.display = 'none';
+  $('my-step-pin').style.display    = 'none';
+  $('my-step-setpin').style.display = 'none';
+  $('my-step-id').style.display     = 'block';
+  $('my-input').value = '';
+  toast('로그아웃됐어요');
+}
+
+// 비밀번호 변경 모달
+function openChangePinModal(){
+  if(!myMember) return;
+  ['cp-old','cp-new1','cp-new2'].forEach(x => $(x).value = '');
+  $('cp-error').style.display = 'none';
+  openModal('changepin-modal');
+}
+function saveChangedPin(){
+  if(!myMember) return;
+  const old  = $('cp-old').value;
+  const new1 = $('cp-new1').value;
+  const new2 = $('cp-new2').value;
+  $('cp-error').style.display = 'none';
+  if(myMember.pin && old !== myMember.pin){
+    $('cp-error').style.display = 'block';
+    $('cp-error').textContent   = '❌ 현재 비밀번호가 틀렸어요';
+    return;
+  }
+  if(new1.length < 4){
+    $('cp-error').style.display = 'block';
+    $('cp-error').textContent   = '❌ 새 비밀번호는 4자리 이상이어야 해요';
+    return;
+  }
+  if(new1 !== new2){
+    $('cp-error').style.display = 'block';
+    $('cp-error').textContent   = '❌ 새 비밀번호가 일치하지 않아요';
+    return;
+  }
+  myMember.pin = new1;
+  saveAll();
+  closeModal('changepin-modal');
+  toast('🔑 비밀번호가 변경됐어요!');
+}
+
+// 관리자: 회원 비밀번호 초기화
+function resetMemberPin(id){
+  const m = members.find(x => x.id === id);
+  if(!m) return;
+  if(!confirm(m.name + '님의 비밀번호를 초기화할까요?\n(다음 로그인 시 새로 설정하게 됩니다)')) return;
+  delete m.pin;
+  saveAll();
+  toast(m.name + ' 비밀번호 초기화 완료 🔓');
+}
+
+// 기존 호환 — loadMyPage 별칭 유지
+function loadMyPage(){ findMember(); }
 function myTab(t,el){
   ['coins','stamps','attend','books'].forEach(x=>$('my-'+x).style.display=x===t?'block':'none');
   document.querySelectorAll('#my-tabs .itab').forEach(b=>b.classList.remove('on'));
@@ -1844,6 +2034,7 @@ function renderMemberList(){
       <div style="flex:1"><div class="sname">${m.name}</div><div class="ssub">${m.grade} · ${m.id} · ${m.joinDate}</div></div>
       <div class="coin-chip" style="margin-right:8px">${m.coins}</div>
       <button class="btn btn-sm" onclick="openMemberEdit('${m.id}')">수정</button>
+      <button class="btn btn-xs btn-a" style="margin-left:4px" onclick="resetMemberPin('${m.id}')" title="비밀번호 초기화">🔑</button>
       <button class="btn btn-xs btn-r" style="margin-left:4px" onclick="delMember('${m.id}')">삭제</button>
     </div>`).join('')||'<div class="empty">회원 없음</div>';
 }
