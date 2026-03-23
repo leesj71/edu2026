@@ -1034,6 +1034,27 @@ function showLoadError(msg){
 let _membersLoaded = false;
 let _stateLoaded   = false;
 
+// ════════════════════════════════════════════════
+// NORMALIZE — Firebase RTDB는 배열을 객체로 변환함 → 다시 배열로 복원
+// ════════════════════════════════════════════════
+function toArr(v){
+  if(!v) return [];
+  if(Array.isArray(v)) return v;
+  // 객체인 경우 → 배열로 변환
+  return Object.values(v);
+}
+function normalizeMember(m){
+  if(!m) return m;
+  return {
+    ...m,
+    attended:  toArr(m.attended),
+    logs:      toArr(m.logs),
+    bookLogs:  toArr(m.bookLogs),
+    // stamps는 {sessionNum: count} 형태의 일반 객체 — 그대로 유지
+    stamps:    (m.stamps && typeof m.stamps === 'object' && !Array.isArray(m.stamps)) ? m.stamps : {}
+  };
+}
+
 function initFirebase(){
   showLoading(true, '☁️ Firebase 연결 중...');
 
@@ -1041,7 +1062,7 @@ function initFirebase(){
   MEMBERS_REF.on('value', snap => {
     const data = snap.val();
     if(data){
-      members = Object.values(data);
+      members = Object.values(data).map(normalizeMember);
       members.sort((a, b) => {
         const na = parseInt(a.id.replace('JD-',''))||0;
         const nb = parseInt(b.id.replace('JD-',''))||0;
@@ -1072,11 +1093,11 @@ function initFirebase(){
   STATE_REF.on('value', snap => {
     const data = snap.val();
     if(data){
-      sessions    = data.sessions    || sessions;
-      foods       = data.foods       || foods;
-      books       = data.books       || books;
-      logs        = data.logs        || [];
-      foodLogs    = data.foodLogs    || [];
+      sessions    = toArr(data.sessions).map(s => ({...s, earn: toArr(s.earn), spend: toArr(s.spend)}));
+      foods       = toArr(data.foods);
+      books       = toArr(data.books);
+      logs        = toArr(data.logs);
+      foodLogs    = toArr(data.foodLogs);
       nextNum     = data.nextNum     || nextNum;
       nextBookNum = data.nextBookNum || nextBookNum;
       introLink   = data.introLink   || '';
